@@ -10,8 +10,8 @@ class Variant:
     values: list[str] # ["True", "False"]
 
 # models = "--models huggyllama/llama-13b EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b huggyllama/llama-30b"
-# models = "--models huggyllama/llama-7b"
-models = "--models sshleifer/tiny-gpt2"
+models = "--models huggyllama/llama-7b"
+# models = "--models sshleifer/tiny-gpt2"
 BURNS_DATASETS = [
     "ag_news",
     "amazon_polarity",
@@ -25,7 +25,7 @@ BURNS_DATASETS = [
 ]
 datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
 binarize = "--binarize"
-num_gpus = "--num_gpus 4"
+num_gpus = "--num_gpus 6"
 
 START_NUM = 0
 
@@ -83,7 +83,6 @@ echo \"idx,status,command\" > $csv_file
                     out_dir += f"{variants[i].flag[2:]}={value}-"
         
         command += num_gpus
-        command += " --max_examples 10 10"
         commands.append(command)
 
     script += "commands=( \\\n"
@@ -104,16 +103,16 @@ done
 len=${{#commands[@]}}
 for ((idx={START_NUM};idx<len;idx++)); do
     command=${{commands[$idx]}}
-    sed -i "s|$idx,NOT STARTED|$idx,RUNNING|g" $csv_file
+    sed -i "s|^$idx,NOT STARTED|$idx,RUNNING|g" $csv_file
     echo "Running command: $command"
     curl -d "Sweep [$idx]: $command" ntfy.sh/derpy
     if ! eval "$command"; then
-        sed -i "s|$idx,RUNNING|$idx,ERROR|g" $csv_file
+        sed -i "s|^$idx,RUNNING|$idx,ERROR|g" $csv_file
         echo "Error occurred: Failed to execute command: $command"
         curl -d "Error occurred: Failed to execute command: $command" ntfy.sh/derpy
         break
     else
-        sed -i "s|$idx,RUNNING|$idx,DONE|g" $csv_file
+        sed -i "s|^$idx,RUNNING|$idx,DONE|g" $csv_file
         echo "Command completed successfully: $command"
         curl -d "Command completed successfully: $command" ntfy.sh/derpy
     fi
@@ -136,7 +135,7 @@ if __name__ == "__main__":
         Variant("visualize", "--visualize", [True])
     ]
 
-    OUT_FILE = "sweep-not-291-beta-verysmall.sh"
+    OUT_FILE = "sweep-not-291-theta-llama7b.sh"
     script = make_script(variants)
     with open(OUT_FILE, "w") as f:
         f.write(script)
