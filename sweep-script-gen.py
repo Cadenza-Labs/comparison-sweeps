@@ -135,7 +135,7 @@ if __name__ == "__main__":
         Variant("visualize", "--visualize", [True])
     ]
 
-    OUT_FILE = "sweep-not-291-theta-llama7b.sh"
+    OUT_FILE = "sweep-not-291.sh"
     script = make_script(variants)
     with open(OUT_FILE, "w") as f:
         f.write(script)
