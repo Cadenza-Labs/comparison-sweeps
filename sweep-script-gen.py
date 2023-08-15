@@ -10,7 +10,8 @@ class Variant:
     values: list[str] # ["True", "False"]
 
 # models = "--models huggyllama/llama-13b EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b huggyllama/llama-30b"
-models = "--models huggyllama/llama-7b"
+# models = "--models huggyllama/llama-7b"
+models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
 BURNS_DATASETS = [
     "ag_news",
@@ -67,7 +68,9 @@ echo \"idx,status,command\" > $csv_file
     combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[1] == "burns")]
     combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[5] == "ccs_prompt_var")] # does not apply for vinc
     combinations = [combo for combo in combinations if not (combo[0] == "ccs" and combo[4] is not None)] # ccs should not have neg_cov_var
+    combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[4] is None)] # vinc should not have None, only 0, 0.5, 1
     combinations = [combo for combo in combinations if not (combo[5] == "ccs_prompt_var" and combo[3] is "1")] # doing this throws a Warning Only one variant provided. Prompt variance loss will cause errors.
+    print(f"Number of combinations: {len(combinations)}")
 
     for combo in combinations:
         command = "elk sweep "
@@ -129,9 +132,10 @@ if __name__ == "__main__":
         Variant("net", "--net", ["ccs", "eigen"]),
         Variant("norm", "--norm", ["burns", None]), 
         Variant("per probe prompt", "--probe_per_prompt", ["True", "False"]), # unrestricted
-        Variant("prompt indices", "--prompt_indices", ["1", None]), # unrestricted
+        Variant("prompt indices", "--prompt_indices", [None]), # unrestricted
         Variant("neg_cov_weight", "--neg_cov_weight", [None, 0, 0.5, 1]), # vinc only
         Variant("loss", "--loss", ["ccs_prompt_var", None]), # vinc only
+        Variant("erase_prompt", "--erase_prompt", [False, True]),
         Variant("visualize", "--visualize", [True])
     ]
 

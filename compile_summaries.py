@@ -296,8 +296,8 @@ final_combined_df = pd.concat([extended_df[non_value_columns], extended_df[value
 
 # for the last nine columns in the DataFrame, replace the float with max(x, 1 - x)
 corrected_df = final_combined_df.copy()
-for col in value_columns:
-    corrected_df[col] = corrected_df[col].apply(lambda x: max(x, 1 - x))
+# for col in value_columns:
+#     corrected_df[col] = corrected_df[col].apply(lambda x: max(x, 1 - x))
 
 # Convert the DataFrame into an HTML table
 html_table = corrected_df.to_html(classes='heatmap', escape=False, table_id="heatmapTable")
