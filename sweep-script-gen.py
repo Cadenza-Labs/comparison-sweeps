@@ -2,6 +2,10 @@ import os
 from dataclasses import dataclass
 from itertools import product
 from rich import print
+import sys
+
+GPUS = sys.argv[2] or 1
+name = sys.argv[1]
 
 @dataclass
 class Variant:
@@ -9,7 +13,7 @@ class Variant:
     flag: str # --promptinv
     values: list[str] # ["True", "False"]
 
-# models = "--models huggyllama/llama-13b EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b huggyllama/llama-30b"
+# models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf huggyllama/llama-30b EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
 # models = "--models huggyllama/llama-7b"
 models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
@@ -26,15 +30,15 @@ BURNS_DATASETS = [
 ]
 datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
 binarize = "--binarize"
-num_gpus = "--num_gpus 6"
+num_gpus = f"--num_gpus {GPUS}"
 
 START_NUM = 0
 
 def make_script(variants: list[Variant]) -> str:
     """Return a script that runs a sweep over the given variants."""
-    script = """#!/bin/bash
+    script = f"""#!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=4
+#SBATCH --gpus-per-node={GPUS}
 #SBATCH --time=2-0
 #SBATCH --partition=single
 #SBATCH --job-name=elk_sweep_alpha
@@ -139,7 +143,7 @@ if __name__ == "__main__":
         Variant("visualize", "--visualize", [True])
     ]
 
-    OUT_FILE = "sweep-not-291.sh"
+    OUT_FILE = f"sweep-not-291-{name}.sh"
     script = make_script(variants)
     with open(OUT_FILE, "w") as f:
         f.write(script)
