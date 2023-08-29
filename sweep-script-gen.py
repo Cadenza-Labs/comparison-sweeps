@@ -4,6 +4,8 @@ from itertools import product
 from rich import print
 import sys
 
+max_model_idx = int(sys.argv[4])
+min_model_idx = int(sys.argv[3])
 GPUS = sys.argv[2] or 1
 name = sys.argv[1]
 
@@ -27,7 +29,8 @@ BURNS_DATASETS = [
     "super_glue:boolq",
     "super_glue:copa",
     "super_glue:rte",
-]
+][min_model_idx: max_model_idx]
+
 datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
 binarize = "--binarize"
 num_gpus = f"--num_gpus {GPUS}"
