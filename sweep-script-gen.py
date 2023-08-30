@@ -15,7 +15,7 @@ class Variant:
     flag: str # --promptinv
     values: list[str] # ["True", "False"]
 
-models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf huggyllama/llama-30b EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
+models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
 # models = "--models huggyllama/llama-7b"
 # models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
