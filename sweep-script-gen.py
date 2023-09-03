@@ -4,10 +4,8 @@ from itertools import product
 from rich import print
 import sys
 
-max_model_idx = int(sys.argv[4])
-min_model_idx = int(sys.argv[3])
-GPUS = sys.argv[2] or 1
-name = sys.argv[1]
+GPUS = 5
+name = "llama-7b"
 
 @dataclass
 class Variant:
@@ -15,8 +13,8 @@ class Variant:
     flag: str # --promptinv
     values: list[str] # ["True", "False"]
 
-models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
-# models = "--models huggyllama/llama-7b"
+# models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
+models = "--models huggyllama/llama-7b"
 # models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
 BURNS_DATASETS = [
@@ -29,7 +27,7 @@ BURNS_DATASETS = [
     "super_glue:boolq",
     "super_glue:copa",
     "super_glue:rte",
-][min_model_idx: max_model_idx]
+]
 
 datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
 binarize = "--binarize"
@@ -91,7 +89,7 @@ echo \"idx,status,command\" > $csv_file
                 else:
                     command += f"{variants[i].flag}={value} "
                     out_dir += f"{variants[i].flag[2:]}={value}-"
-                if net == "ccs" and variantes[i].flag == "erase_prompt":
+                if net == "ccs" and variantes[i].flag == "--erase_prompt":
                     # ignore --erase_prompt for CCS for now
                     pass
         command += num_gpus
