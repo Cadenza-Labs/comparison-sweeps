@@ -91,7 +91,9 @@ echo \"idx,status,command\" > $csv_file
                 else:
                     command += f"{variants[i].flag}={value} "
                     out_dir += f"{variants[i].flag[2:]}={value}-"
-        
+                if net == "ccs" and variantes[i].flag == "erase_prompt":
+                    # ignore --erase_prompt for CCS for now
+                    pass
         command += num_gpus
         commands.append(command)
 
