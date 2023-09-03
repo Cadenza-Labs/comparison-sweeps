@@ -65,7 +65,6 @@ done
 csv_file="commands_status-$j.csv"
 echo \"idx,status,command\" > $csv_file
 """
-    script += "set -e\n\n"
     script += "# cd ../elk\n"
 
     combinations = list(product(*[variant.values for variant in variants]))
