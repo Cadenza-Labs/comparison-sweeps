@@ -82,16 +82,17 @@ echo \"idx,status,command\" > $csv_file
         command += models + " " + datasets + " " + binarize + " "
         out_dir = "--name "
         for i, value in enumerate(combo):
-            net = combo[1]
+            net = combo[0]
             if value is not None:
                 if net == "eigen" and variants[i].flag == "--norm":
+                    pass
+                elif net == "ccs" and variants[i].flag == "--erase_prompt":
+                    # ignore --erase_prompt for CCS for now
                     pass
                 else:
                     command += f"{variants[i].flag}={value} "
                     out_dir += f"{variants[i].flag[2:]}={value}-"
-                if net == "ccs" and variantes[i].flag == "--erase_prompt":
-                    # ignore --erase_prompt for CCS for now
-                    pass
+
         command += num_gpus
         commands.append(command)
 
