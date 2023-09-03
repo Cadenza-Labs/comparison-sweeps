@@ -1,0 +1,6 @@
+{
+    "name": "sample_experiment",
+    "GPUS": 4,
+    "model_indexes": [0, 1, 2, 3, 4],
+    "dataset_indexes": [0, 1, 2, 3, 4, 5, 6, 7, 8]
+}

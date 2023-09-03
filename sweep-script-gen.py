@@ -1,35 +1,81 @@
 import os
+import json
 from dataclasses import dataclass
-from itertools import product
 from rich import print
 import sys
+import itertools
 
-max_model_idx = int(sys.argv[4])
-min_model_idx = int(sys.argv[3])
-GPUS = sys.argv[2] or 1
-name = sys.argv[1]
+if len(sys.argv) != 2:
+    print("Usage: script_name '<path_to_json_config_or_json_string>'")
+    sys.exit(1)
+
+input_str = sys.argv[1]
+
+# Check if input is a file path or JSON string
+if os.path.exists(input_str):
+    with open(input_str, 'r') as f:
+        config = json.load(f)
+else:
+    try:
+        config = json.loads(input_str)
+    except json.JSONDecodeError:
+        print(f"Error: The provided input is neither a valid file path nor a valid JSON string.")
+        sys.exit(1)
+
+# Check necessary keys in the JSON
+required_keys = ["name", "GPUS", "model_indexes", "dataset_indexes"]
+for key in required_keys:
+    if key not in config:
+        print(f"Missing key in config: {key}")
+        sys.exit(1)
+
+name = config["name"]
+GPUS = config["GPUS"]
+model_indexes = config["model_indexes"]
+dataset_indexes = config["dataset_indexes"]
 
 @dataclass
 class Variant:
-    name: str # prompt invariance
-    flag: str # --promptinv
-    values: list[str] # ["True", "False"]
+    name: str # Name like 'prompt invariance'
+    flag: str # CLI flag like '--promptinv'
+    values: list[str]  # Values it can take, e.g. ["True", "False"]
 
-models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
-# models = "--models huggyllama/llama-7b"
-# models = "--models gpt2"
-# models = "--models sshleifer/tiny-gpt2"
+### SELECTING MODELS AND DATASETS ###
+
+models_list = [
+    "meta-llama/Llama-2-7b-hf",   # 0
+    "meta-llama/Llama-2-13b-hf",  # 1
+    "EleutherAI/pythia-12b",      # 2
+    "bigscience/bloom-7b1",       # 3
+    "EleutherAI/pythia-6.9b"      # 4
+]
+
+selected_models = [models_list[idx] for idx in model_indexes if 0 <= idx < len(models_list)]
+
+if not selected_models:
+    print(f"No valid model indexes provided.")
+    sys.exit(1)
+
+models = "--models " + " ".join(f"'{model}'" for model in selected_models)
+
 BURNS_DATASETS = [
-    "ag_news",
-    "amazon_polarity",
-    "dbpedia_14",
-    "glue:qnli",
-    "imdb",
-    "piqa",
-    "super_glue:boolq",
-    "super_glue:copa",
-    "super_glue:rte",
-][min_model_idx: max_model_idx]
+    "ag_news",          # 0
+    "amazon_polarity",  # 1
+    "dbpedia_14",       # 2
+    "glue:qnli",        # 3
+    "imdb",             # 4
+    "piqa",             # 5
+    "super_glue:boolq", # 6
+    "super_glue:copa",  # 7
+    "super_glue:rte",   # 8
+]
+
+selected_datasets = [BURNS_DATASETS[idx] for idx in dataset_indexes if 0 <= idx < len(BURNS_DATASETS)]
+if not selected_datasets:
+    print(f"No valid dataset indexes provided.")
+    sys.exit(1)
+
+### COMPOSING THE CLI COMMAND ###
 
 datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
 binarize = "--binarize"
@@ -67,7 +113,7 @@ echo \"idx,status,command\" > $csv_file
 """
     script += "# cd ../elk\n"
 
-    combinations = list(product(*[variant.values for variant in variants]))
+    combinations = list(itertools.product(*[variant.values for variant in variants]))
 
     commands = []
 
