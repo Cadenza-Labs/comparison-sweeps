@@ -5,7 +5,7 @@ from rich import print
 import sys
 
 GPUS = 5
-name = "llama-7b"
+name = "Llama-2-7b-hf"
 
 @dataclass
 class Variant:
@@ -14,7 +14,7 @@ class Variant:
     values: list[str] # ["True", "False"]
 
 # models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
-models = "--models huggyllama/llama-7b"
+models = "--models meta-llama/Llama-2-7b-hf"
 # models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
 BURNS_DATASETS = [
