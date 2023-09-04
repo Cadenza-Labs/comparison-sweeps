@@ -117,11 +117,22 @@ echo \"idx,status,command\" > $csv_file
 
     commands = []
 
-    combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[1] == "burns")]
-    combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[5] == "ccs_prompt_var")] # does not apply for vinc
-    combinations = [combo for combo in combinations if not (combo[0] == "ccs" and combo[4] is not None)] # ccs should not have neg_cov_var
-    combinations = [combo for combo in combinations if not (combo[0] == "eigen" and combo[4] is None)] # vinc should not have None, only 0, 0.5, 1
-    combinations = [combo for combo in combinations if not (combo[5] == "ccs_prompt_var" and combo[3] is "1")] # doing this throws a Warning Only one variant provided. Prompt variance loss will cause errors.
+    NET = 0
+    NORM = 1
+    PER_PROBE_PROMPT = 2
+    PROMPT_INDICES = 3
+    NEG_COV_WEIGHT = 4
+    LOSS = 5
+    ERASE_PROMPT = 6
+    VISUALIZE = 7
+
+    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[NORM] == "burns")]
+    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[LOSS] == "ccs_prompt_var")]  # does not apply for vinc
+    combinations = [combo for combo in combinations if not (combo[NET] == "ccs" and combo[NEG_COV_WEIGHT] is not None)]  # ccs should not have neg_cov_var
+    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[NEG_COV_WEIGHT] is None)]  # vinc should not have None, only 0, 0.5, 1
+    combinations = [combo for combo in combinations if not (combo[LOSS] == "ccs_prompt_var" and combo[PROMPT_INDICES] == "1")]  # doing this throws a Warning Only one variant provided. Prompt variance loss will cause errors.
+    combinations = [combo for combo in combinations if not (combo[NET] == "ccs" and combo[ERASE_PROMPT] is True)]  # exclude if erase_prompt is true and net is ccs
+
     print(f"Number of combinations: {len(combinations)}")
 
     for combo in combinations:
@@ -138,6 +149,8 @@ echo \"idx,status,command\" > $csv_file
                     out_dir += f"{variants[i].flag[2:]}={value}-"
         
         command += num_gpus
+        # add visualize
+        command += " --visualize True"
         commands.append(command)
 
     script += "commands=( \\\n"
@@ -180,16 +193,16 @@ done
 
 
 if __name__ == "__main__":
-    variants = [ # do not change order because the order matters
-        Variant("net", "--net", ["ccs", "eigen"]),
-        Variant("norm", "--norm", ["burns", None]), 
-        Variant("per probe prompt", "--probe_per_prompt", ["True", "False"]), # unrestricted
-        Variant("prompt indices", "--prompt_indices", [None]), # unrestricted
-        Variant("neg_cov_weight", "--neg_cov_weight", [None, 0, 0.5, 1]), # vinc only
-        Variant("loss", "--loss", ["ccs_prompt_var", None]), # vinc only
-        Variant("erase_prompt", "--erase_prompt", [False, True]),
-        Variant("visualize", "--visualize", [True])
+    variants = [
+        Variant("net", "--net", ["ccs", "eigen"]),  # 0
+        Variant("norm", "--norm", ["burns", None]),  # 1
+        Variant("per probe prompt", "--probe_per_prompt", ["True", "False"]),  # 2
+        Variant("prompt indices", "--prompt_indices", [None]),  # 3
+        Variant("neg_cov_weight", "--neg_cov_weight", [None, 0, 0.5, 1]),  # 4
+        Variant("loss", "--loss", ["ccs_prompt_var", None]),  # 5
+        Variant("erase_prompt", "--erase_prompt", [False, True]),  # 6
     ]
+
 
     OUT_FILE = f"sweep-not-291-{name}.sh"
     script = make_script(variants)
