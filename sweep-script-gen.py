@@ -13,13 +13,15 @@ input_str = sys.argv[1]
 
 # Check if input is a file path or JSON string
 if os.path.exists(input_str):
-    with open(input_str, 'r') as f:
+    with open(input_str, "r") as f:
         config = json.load(f)
 else:
     try:
         config = json.loads(input_str)
     except json.JSONDecodeError:
-        print(f"Error: The provided input is neither a valid file path nor a valid JSON string.")
+        print(
+            f"Error: The provided input is neither a valid file path nor a valid JSON string."
+        )
         sys.exit(1)
 
 # Check necessary keys in the JSON
@@ -34,23 +36,27 @@ GPUS = config["GPUS"]
 model_indexes = config["model_indexes"]
 dataset_indexes = config["dataset_indexes"]
 
+
 @dataclass
 class Variant:
-    name: str # Name like 'prompt invariance'
-    flag: str # CLI flag like '--promptinv'
+    name: str  # Name like 'prompt invariance'
+    flag: str  # CLI flag like '--promptinv'
     values: list[str]  # Values it can take, e.g. ["True", "False"]
+
 
 ### SELECTING MODELS AND DATASETS ###
 
 models_list = [
-    "meta-llama/Llama-2-7b-hf",   # 0
+    "meta-llama/Llama-2-7b-hf",  # 0
     "meta-llama/Llama-2-13b-hf",  # 1
-    "EleutherAI/pythia-12b",      # 2
-    "bigscience/bloom-7b1",       # 3
-    "EleutherAI/pythia-6.9b"      # 4
+    "EleutherAI/pythia-12b",  # 2
+    "bigscience/bloom-7b1",  # 3
+    "EleutherAI/pythia-6.9b",  # 4
 ]
 
-selected_models = [models_list[idx] for idx in model_indexes if 0 <= idx < len(models_list)]
+selected_models = [
+    models_list[idx] for idx in model_indexes if 0 <= idx < len(models_list)
+]
 
 if not selected_models:
     print(f"No valid model indexes provided.")
@@ -59,29 +65,32 @@ if not selected_models:
 models = "--models " + " ".join(f"'{model}'" for model in selected_models)
 
 BURNS_DATASETS = [
-    "ag_news",          # 0
+    "ag_news",  # 0
     "amazon_polarity",  # 1
-    "dbpedia_14",       # 2
-    "glue:qnli",        # 3
-    "imdb",             # 4
-    "piqa",             # 5
-    "super_glue:boolq", # 6
+    "dbpedia_14",  # 2
+    "glue:qnli",  # 3
+    "imdb",  # 4
+    "piqa",  # 5
+    "super_glue:boolq",  # 6
     "super_glue:copa",  # 7
-    "super_glue:rte",   # 8
+    "super_glue:rte",  # 8
 ]
 
-selected_datasets = [BURNS_DATASETS[idx] for idx in dataset_indexes if 0 <= idx < len(BURNS_DATASETS)]
+selected_datasets = [
+    BURNS_DATASETS[idx] for idx in dataset_indexes if 0 <= idx < len(BURNS_DATASETS)
+]
 if not selected_datasets:
     print(f"No valid dataset indexes provided.")
     sys.exit(1)
 
 ### COMPOSING THE CLI COMMAND ###
 
-datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in BURNS_DATASETS)
+datasets = "--datasets " + " ".join(f"'{dataset}'" for dataset in selected_datasets)
 binarize = "--binarize"
 num_gpus = f"--num_gpus {GPUS}"
 
 START_NUM = 0
+
 
 def make_script(variants: list[Variant]) -> str:
     """Return a script that runs a sweep over the given variants."""
@@ -126,12 +135,36 @@ echo \"idx,status,command\" > $csv_file
     ERASE_PROMPT = 6
     VISUALIZE = 7
 
-    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[NORM] == "burns")]
-    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[LOSS] == "ccs_prompt_var")]  # does not apply for vinc
-    combinations = [combo for combo in combinations if not (combo[NET] == "ccs" and combo[NEG_COV_WEIGHT] is not None)]  # ccs should not have neg_cov_var
-    combinations = [combo for combo in combinations if not (combo[NET] == "eigen" and combo[NEG_COV_WEIGHT] is None)]  # vinc should not have None, only 0, 0.5, 1
-    combinations = [combo for combo in combinations if not (combo[LOSS] == "ccs_prompt_var" and combo[PROMPT_INDICES] == "1")]  # doing this throws a Warning Only one variant provided. Prompt variance loss will cause errors.
-    combinations = [combo for combo in combinations if not (combo[NET] == "ccs" and combo[ERASE_PROMPT] is True)]  # exclude if erase_prompt is true and net is ccs
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[NET] == "eigen" and combo[NORM] == "burns")
+    ]
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[NET] == "eigen" and combo[LOSS] == "ccs_prompt_var")
+    ]  # does not apply for vinc
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[NET] == "ccs" and combo[NEG_COV_WEIGHT] is not None)
+    ]  # ccs should not have neg_cov_var
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[NET] == "eigen" and combo[NEG_COV_WEIGHT] is None)
+    ]  # vinc should not have None, only 0, 0.5, 1
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[LOSS] == "ccs_prompt_var" and combo[PROMPT_INDICES] == "1")
+    ]  # doing this throws a Warning Only one variant provided. Prompt variance loss will cause errors.
+    combinations = [
+        combo
+        for combo in combinations
+        if not (combo[NET] == "ccs" and combo[ERASE_PROMPT] is True)
+    ]  # exclude if erase_prompt is true and net is ccs
 
     print(f"Number of combinations: {len(combinations)}")
 
@@ -147,7 +180,7 @@ echo \"idx,status,command\" > $csv_file
                 else:
                     command += f"{variants[i].flag}={value} "
                     out_dir += f"{variants[i].flag[2:]}={value}-"
-        
+
         command += num_gpus
         # add visualize
         command += " --visualize True"
@@ -166,28 +199,28 @@ for command in "${commands[@]}"; do
     ((idx=idx+1))
 done
 """
-
+    ntfy_name = "derpy"
     script += f"""
 len=${{#commands[@]}}
 for ((idx={START_NUM};idx<len;idx++)); do
     command=${{commands[$idx]}}
     sed -i "s|^$idx,NOT STARTED|$idx,RUNNING|g" $csv_file
     echo "Running command: $command"
-    curl -d "Sweep [$idx]: $command" ntfy.sh/derpy
+    curl -d "Sweep [$idx]: $command" ntfy.sh/{ntfy_name}
     if ! eval "$command"; then
         sed -i "s|^$idx,RUNNING|$idx,ERROR|g" $csv_file
         echo "Error occurred: Failed to execute command: $command"
-        curl -d "Error occurred: Failed to execute command: $command" ntfy.sh/derpy
+        curl -d "[$idx] Error occurred" ntfy.sh/{ntfy_name}
         break
     else
         sed -i "s|^$idx,RUNNING|$idx,DONE|g" $csv_file
         echo "Command completed successfully: $command"
-        curl -d "Command completed successfully: $command" ntfy.sh/derpy
+        curl -d "[$idx] Success" ntfy.sh/{ntfy_name}
     fi
 done
 """
 
-    script += "echo 'All combinations completed.'\n" 
+    script += "echo 'All combinations completed.'\n"
 
     return script
 
@@ -203,18 +236,8 @@ if __name__ == "__main__":
         Variant("erase_prompt", "--erase_prompt", [False, True]),  # 6
     ]
 
-
     OUT_FILE = f"sweep-not-291-{name}.sh"
     script = make_script(variants)
     with open(OUT_FILE, "w") as f:
         f.write(script)
     os.system(f"chmod +x {OUT_FILE}")
-
-
-
-
-
-
-
-
-
