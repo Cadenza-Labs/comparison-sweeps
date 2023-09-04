@@ -163,7 +163,7 @@ echo \"idx,status,command\" > $csv_file
     combinations = [
         combo
         for combo in combinations
-        if not (combo[NET] == "ccs" and combo[ERASE_PROMPT] is True)
+        if not (combo[NET] == "ccs" and bool(combo[ERASE_PROMPT]) is False)
     ]  # exclude if erase_prompt is true and net is ccs
 
     print(f"Number of combinations: {len(combinations)}")
