@@ -5,7 +5,7 @@ from rich import print
 import sys
 
 GPUS = 5
-name = "Llama-2-7b-hf"
+name = "Llama-2-13b-hf"
 
 @dataclass
 class Variant:
@@ -14,7 +14,7 @@ class Variant:
     values: list[str] # ["True", "False"]
 
 # models = "--models meta-llama/Llama-2-7b-hf meta-llama/Llama-2-13b-hf EleutherAI/pythia-12b bigscience/bloom-7b1 EleutherAI/pythia-6.9b"
-models = "--models meta-llama/Llama-2-7b-hf"
+models = "--models meta-llama/Llama-2-13b-hf"
 # models = "--models gpt2"
 # models = "--models sshleifer/tiny-gpt2"
 BURNS_DATASETS = [
@@ -95,9 +95,10 @@ echo \"idx,status,command\" > $csv_file
 
         command += num_gpus
         commands.append(command)
-
+    
+    unique_commands = set(commands)
     script += "commands=( \\\n"
-    for command in commands:
+    for command in unique_commands:
         print(command + "\n")
         script += f'"{command}" \\\n'
     script = script[:-2] + "\n)\n\n"
