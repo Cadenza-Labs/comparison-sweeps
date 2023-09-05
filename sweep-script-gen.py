@@ -211,7 +211,6 @@ for ((idx={START_NUM};idx<len;idx++)); do
         sed -i "s|^$idx,RUNNING|$idx,ERROR|g" $csv_file
         echo "Error occurred: Failed to execute command: $command"
         curl -d "[$idx] Error occurred" ntfy.sh/{ntfy_name}
-        break
     else
         sed -i "s|^$idx,RUNNING|$idx,DONE|g" $csv_file
         echo "Command completed successfully: $command"
