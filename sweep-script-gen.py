@@ -52,6 +52,7 @@ models_list = [
     "EleutherAI/pythia-12b",  # 2
     "bigscience/bloom-7b1",  # 3
     "EleutherAI/pythia-6.9b",  # 4
+    "gpt2",  # 5
 ]
 
 selected_models = [
@@ -199,7 +200,7 @@ for command in "${commands[@]}"; do
     ((idx=idx+1))
 done
 """
-    ntfy_name = "derpy"
+    ntfy_name = "elk-sweeps"
     script += f"""
 len=${{#commands[@]}}
 for ((idx={START_NUM};idx<len;idx++)); do

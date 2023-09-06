@@ -3,13 +3,13 @@ import itertools
 import os
 import sys
 
-# Lists from your previous script
 models_list = [
     "meta-llama/Llama-2-7b-hf",
     "meta-llama/Llama-2-13b-hf",
     "EleutherAI/pythia-12b",
     "bigscience/bloom-7b1",
     "EleutherAI/pythia-6.9b",
+    "gpt2",
 ]
 
 BURNS_DATASETS = [
@@ -50,8 +50,10 @@ if __name__ == "__main__":
     GPUS = 1  # Set to your desired GPU count
 
     # Generate configurations for every combination of model and dataset
+    selected_model_idxes = [3, 4, 5]
     for model_idx, dataset_idx in itertools.product(
         range(len(models_list)), range(len(BURNS_DATASETS))
     ):
-        generate_config_file_for_combination(model_idx, dataset_idx, GPUS)
+        if model_idx in selected_model_idxes:
+            generate_config_file_for_combination(model_idx, dataset_idx, GPUS)
     print("Configs generated at ./configs")
