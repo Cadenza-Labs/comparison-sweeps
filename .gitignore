@@ -1,6 +1,6 @@
 not-133-sweep-out-*
 commands_status-*
-scripts
+/scripts
 status
 */data/*
 configs
