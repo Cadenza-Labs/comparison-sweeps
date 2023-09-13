@@ -76,6 +76,17 @@ def render_summary_json(data, model_name):
     h1_tag.string = model_name
     body_tag.append(h1_tag)
 
+    # add list of datasets represented
+    datasets = data[0]['summary'].keys()
+    
+    h2_tag = soup.new_tag('h2') 
+    h2_tag.string = 'Datasets represented:'
+    body_tag.append(h2_tag)
+    for dataset in datasets:
+        p_tag = soup.new_tag('p')
+        p_tag.string = dataset
+        body_tag.append(p_tag)
+
     # Add the DataFrame content to the body
     body_tag.append(BeautifulSoup(html, 'html.parser'))
     html = str(soup)

@@ -1,0 +1,2 @@
+dataset,layer,correct norm accuracy,incorrect norm accuracy
+imdb,1,0.5230769515037537,0.5

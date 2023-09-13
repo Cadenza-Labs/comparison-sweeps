@@ -26,6 +26,7 @@ def down_two(sweep_path):
 
 
 def extract_values(eval_filepath, layer_ensembling_filepath):
+    print(f"extracting values from {eval_filepath} and {layer_ensembling_filepath}")
     eval_df = pd.read_csv(eval_filepath)
     last_layer = eval_df['layer'].max()
     three_quarters_layer = round(last_layer * 0.75)
