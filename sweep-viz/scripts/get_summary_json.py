@@ -114,10 +114,10 @@ def extract_sweep_data_corrected(sweep_path):
         "summary": {},
         "parsed_config": {}
     }
-    subdir_path = down_two(Path(sweep_path))
-    datasets = ['ag_news', 'amazon_polarity', 'dbpedia_14', 'glue:qnli', 'imdb', 'piqa', 'super_glue:boolq', 'super_glue:copa', 'super_glue:rte']
-    for dataset in datasets:
-        dataset_path = os.path.join(subdir_path, dataset)
+    sweep_path = Path(sweep_path)
+    model_path = down_two(Path(sweep_path))
+    for dataset_path in model_path.iterdir():
+        dataset = dataset_path.name
         eval_filepath = os.path.join(dataset_path, 'eval.csv')
         layer_ensembling_filepath = os.path.join(dataset_path, 'layer_ensembling.csv')
         yaml_filepath = os.path.join(dataset_path, 'cfg.yaml')
