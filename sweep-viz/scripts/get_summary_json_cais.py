@@ -135,8 +135,12 @@ def down_two(sweep_path):
 
 new_root = Path('/Users/jon/projects/notodai/scripts/comparison-sweeps/sweep-viz/data/sweeps-no')
 sweep_paths = [new_root / Path(sweep).name for i in range(26) for sweep in extract_multiple_sweep_paths_from_log(f"/Users/jon/Downloads/scripts-230906-beta/not-133-sweep-out-{i}.txt")]
-assert len(sweep_paths) == 520
-assert len(set(sweep_paths)) == 520
+second = [new_root / Path(sweep).name for i in range(9) for sweep in extract_multiple_sweep_paths_from_log(f"/Users/jon/Downloads/scripts-230912/not-133-sweep-out-{i}.txt")]
+MISSING = ""
+
+sweep_paths += second + [MISSING]
+assert len(sweep_paths) == 520 + 180
+assert len(set(sweep_paths)) == 520 + 180
 
 def hashconfig(config):
     return frozenset(config.items())
@@ -275,9 +279,10 @@ def get_summary(config, model):
     return summary
 
 for model in all_models:
-    # for config in all_parsed:
-        # get_summary(config, model)
+    model = model.replace("/", "-")
     summaries = [get_summary(config, model) for config in all_parsed]
     print(summaries)
-    render_summary_json(summaries, model.replace("/", "-"))
+    with open(f'./data/summary_{model}.json', 'w') as f:
+        json.dump(summaries, f, indent=4)
+    render_summary_json(summaries, model)
 
