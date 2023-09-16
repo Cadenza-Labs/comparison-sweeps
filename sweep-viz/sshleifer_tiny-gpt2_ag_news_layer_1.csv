@@ -1,0 +1,2 @@
+dataset,layer,correct norm accuracy,incorrect norm accuracy
+ag_news,1,0.5149999856948853,0.5099999904632568

@@ -1,10 +1,46 @@
 import os
 import pandas as pd
 import yaml
-import json
-import sys
 import os
 from pathlib import Path
+from rich import print
+
+from dataclasses import dataclass
+
+@dataclass
+class Sweep:
+    name: str | None
+    models: list
+    datasets: list
+    args: dict
+
+    def from_df_row(row: pd.Series):
+        model = row['model']
+        dataset = row['dataset']
+        columns_to_drop =  ['sweep_name', 'model', 'dataset']
+        columns_to_drop_existing = [col for col in columns_to_drop if col in row]
+        row = row.drop(columns_to_drop_existing)
+        # if value is NAN OR empty then drop the column
+        # row = row.dropna()
+        row = row[row != ""]
+        return Sweep(
+            name=row.get('sweep_name', None),
+            models=[model],
+            datasets=[dataset],
+            args=row.to_dict()
+        )
+    
+    def to_df_row(self):
+        return {
+            'sweep_name': self.name,
+            'models': ' '.join(self.models),
+            'datasets': ' '.join(self.datasets),
+            'args': self.args
+        }
+
+    def to_command(self, extra_args={}):
+        argstring = " ".join([f"--{k} {v}" for k, v in (*self.args.items(), *extra_args.items())])
+        return f"elk sweep --models {' '.join(self.models)} --datasets {' '.join(self.datasets)} {argstring}"
 
 def down_two(sweep_path):
     current_path = sweep_path
@@ -26,7 +62,7 @@ def down_two(sweep_path):
 
 
 def extract_values(eval_filepath, layer_ensembling_filepath):
-    print(f"extracting values from {eval_filepath} and {layer_ensembling_filepath}")
+    # print(f"extracting values from {eval_filepath} and {layer_ensembling_filepath}")
     eval_df = pd.read_csv(eval_filepath)
     last_layer = eval_df['layer'].max()
     three_quarters_layer = round(last_layer * 0.75)
@@ -107,23 +143,26 @@ def parse_yaml_content(yaml_content):
         result[variant.key] = variant.extract_value(yaml_data)
     return result
 
+df = pd.DataFrame()
+
 # Main extraction function
 def extract_sweep_data_corrected(sweep_path):
+    global df
     results = {
-        "path": os.path.basename(sweep_path),
+        "sweep_name": os.path.basename(sweep_path),
         "summary": {},
         "parsed_config": {}
     }
     sweep_path = Path(sweep_path)
     model_path = down_two(Path(sweep_path))
-    for dataset_path in model_path.iterdir():
+    for dataset_path in model_path.iterdir():  # for each dataset path, we want to get the eval.csv and layer_ensembling.csv and dump into a df and append
         dataset = dataset_path.name
         eval_filepath = os.path.join(dataset_path, 'eval.csv')
         layer_ensembling_filepath = os.path.join(dataset_path, 'layer_ensembling.csv')
         yaml_filepath = os.path.join(dataset_path, 'cfg.yaml')
         if not os.path.exists(eval_filepath) or not os.path.exists(layer_ensembling_filepath):
             continue
-        results["summary"][dataset] = extract_values(eval_filepath, layer_ensembling_filepath)
+        results["summary"] = extract_values(eval_filepath, layer_ensembling_filepath)
         if not results["parsed_config"] and os.path.exists(yaml_filepath):
             with open(yaml_filepath, 'r') as f:
                 yaml_content = f.read()
@@ -131,9 +170,20 @@ def extract_sweep_data_corrected(sweep_path):
         # also get: model and ds, should be easy by just printing from the path
         # i guess we also want the transfer configs too
         # and robust error handling, list of sweeps that don't have all the right stuff
+        if model_path.name == "gpt2":
+            model = model_path.name
+        else:
+            model = f"{model_path.parent.name}/{model_path.name}"
         
-        
+        results["model"] = model
+        results["dataset"] = dataset
 
+        flattened_res = {
+            **results['parsed_config'], 
+            **{'model': model, 'dataset': dataset, 'sweep_name': results['sweep_name']}, 
+            **results['summary']
+        }
+        df = pd.concat([df, pd.DataFrame.from_dict([flattened_res])], ignore_index=True)
     
     return results
 
@@ -163,10 +213,63 @@ def get_summary(sweeps_path):
     return filtered
 
 
-from dataclasses import dataclass
-@dataclass
-class Summary:
-    model: str
-    dataset: str
-    config: str
-    auroc: float
+def find_missing_combinations(df):
+    # Create a column with the combination of the six config values as a string
+    df['combo'] = df[['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']].astype(str).apply(lambda x: '-'.join(x), axis=1)
+
+    # Create a DataFrame of all possible combinations
+    all_possible_combinations = pd.MultiIndex.from_product([
+        df['model'].unique(),
+        df['dataset'].unique(),
+        df['combo'].unique()
+    ], names=['model', 'dataset', 'combo']).to_frame(index=False)
+
+    # Merge with unique_entries to find missing combinations
+    unique_entries = df[['model', 'dataset', 'combo']].drop_duplicates()
+    missing_combinations = all_possible_combinations.merge(unique_entries, on=['model', 'dataset', 'combo'], how='left', indicator=True)
+    missing_combinations = missing_combinations[missing_combinations['_merge'] == 'left_only'][['model', 'dataset', 'combo']]
+    
+    # Split the 'combo' column back to original columns
+    config_cols = ['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']
+    missing_combinations[config_cols] = missing_combinations['combo'].str.split('-', expand=True)
+    
+    # Convert "nan" back to empty strings for certain columns
+    for col in config_cols:
+        missing_combinations[col] = missing_combinations[col].replace('nan', '')
+    
+    # Drop the 'combo' column and return the missing rows
+    missing_combinations = missing_combinations.drop(columns=['combo'])
+
+    return [Sweep.from_df_row(row) for i, row in missing_combinations.iterrows()]
+
+
+if __name__ == '__main__':
+    import os
+    from pathlib import Path
+
+    filename = 'all_results.csv'
+
+    # load if exists
+    # if os.path.exists(filename):
+    #     df = pd.read_csv(filename)
+    # else:
+    data_directory = Path('./data').resolve()  # Replace with the correct path to your data directory
+    all_sweep_dirs = [
+        (data_directory / sweeps).resolve() 
+        for sweeps in os.listdir(data_directory) 
+        if (path := Path(os.path.join(data_directory, sweeps))).is_dir() and 
+        path.name.endswith('_no_reporters')
+    ]
+    for sweeps in all_sweep_dirs:
+        summary = get_summary(sweeps)
+
+    df.to_csv(filename, index=False)
+    missing_sweeps = find_missing_combinations(df)
+    extra_args = {
+        'num_gpus': 4,
+    }
+    for sweep in missing_sweeps:
+        print(f'"{sweep.to_command(extra_args)}" \\')
+        
+
+    
