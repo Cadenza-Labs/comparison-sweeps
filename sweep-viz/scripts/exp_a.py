@@ -1,8 +1,15 @@
 import pandas as pd
 import numpy as np
 from rich import print
+from dataclasses import dataclass
+from typing import Callable, Tuple
 
-def exp_a(df):
+@dataclass
+class Experiment:
+    partition_fn: Callable[[pd.DataFrame], Tuple[pd.DataFrame, pd.DataFrame]]
+    names: (str, str)
+
+def fn_a(df):
     # Condition 1: net=ccs, loss=1.0*ccs_prompt_var
     df_condition_1 = df[
         (df['net'] == 'ccs') & 
@@ -22,7 +29,7 @@ def exp_a(df):
     ]
     return df_condition_1, df_condition_2
 
-def exp_c(df):
+def fn_c(df):
     # Condition 1: net=ccs, norm=burns
     df_condition_1 = df[
         (df['net'] == 'ccs') & 
@@ -42,8 +49,8 @@ def exp_c(df):
     ]
     return df_condition_1, df_condition_2
 
-def exp_d(df):
-    # Condition 1: net=ccs, norm=burns
+def fn_d(df):
+    # Condition 1: erase_prompt=True
     net = 'eigen'
     ppp = False
     ncw = 1.0
@@ -56,9 +63,9 @@ def exp_d(df):
         (df['erase_prompt'] == True)
     ]
 
-    # Condition 2: net=ccs, norm=leace
+    # Condition 2: erase_prompt=False
     df_condition_2 = df[
-        (df['net'] == 'eigen') & 
+        (df['net'] == net) & 
         (df['loss'].isna()) &
         (df['norm'].isna()) &
         (df['neg_cov_weight'] == ncw) &
@@ -67,8 +74,8 @@ def exp_d(df):
     ]
     return df_condition_1, df_condition_2
 
-def exp_e(df):
-    # Condition 1: net=ccs, norm=burns
+def fn_e(df):
+    # Condition 1: neg_cov_weight=1.0
     net = 'eigen'
     ppp = False
     erase_prompt = False
@@ -78,12 +85,12 @@ def exp_e(df):
         (df['norm'].isna()) &
         (df['neg_cov_weight'] == 1.0) &
         (df['per probe prompt'] == ppp) &
-        (df['erase_prompt'] == True)
+        (df['erase_prompt'] == erase_prompt)
     ]
 
-    # Condition 2: net=ccs, norm=leace
+    # Condition 2: neg_cov_weight=0.5
     df_condition_2 = df[
-        (df['net'] == 'eigen') & 
+        (df['net'] == net) & 
         (df['loss'].isna()) &
         (df['norm'].isna()) &
         (df['neg_cov_weight'] == 0.5) &
@@ -92,7 +99,13 @@ def exp_e(df):
     ]
     return df_condition_1, df_condition_2
 
-def analyze_csv_results(csv_path, exp):
+exp_a = Experiment(fn_a, ('ccs_prompt_var', 'ccs'))
+exp_c = Experiment(fn_c, ('ccs+burns', 'ccs+leace'))
+exp_d = Experiment(fn_d, ('vinc erase prompt', 'vinc'))
+exp_e = Experiment(fn_e, ('ncw=1.0', 'ncw=0.5'))
+exps = [exp_a, exp_c, exp_d, exp_e]
+
+def analyze_csv_results(csv_path, exp: Experiment):
     # Load the CSV
     df = pd.read_csv(csv_path)
     # breakpoint()
@@ -105,7 +118,7 @@ def analyze_csv_results(csv_path, exp):
     # Filter the dataframe for the two specified conditions
     cols_to_average = df.columns[-10:-1]
 
-    df_condition_1, df_condition_2 = exp(df)
+    df_condition_1, df_condition_2 = exp.partition_fn(df)
 
     filtermodel = lambda df, model: df[df['model'] == model]
 
@@ -119,14 +132,16 @@ def analyze_csv_results(csv_path, exp):
         # stack 1 and 2
         stacked = pd.concat(means, axis=1)
         print(f'[magenta]{model}[/magenta]')
+        # rename cols
+        stacked.columns = exp.names
         print(stacked)
 
     print(f'[magenta]Overall[/magenta]')
     stacked = pd.concat([df_condition_1[cols_to_average].mean(), df_condition_2[cols_to_average].mean()], axis=1)
+    stacked.columns = exp.names
     print(stacked)
 
 
-for exp in [exp_a, exp_c, exp_d, exp_e]:
-    print(f"Results for {exp.__name__}")
+for exp in exps:
     analyze_csv_results('all_results.csv', exp)
     print("\n\n")
