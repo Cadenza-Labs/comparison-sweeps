@@ -53,6 +53,8 @@ def down_two(sweep_path):
         if len(subdirectories) == 1:
             # If there's only one directory at this level, navigate to it
             current_path = subdirectories[0]
+            if current_path.name == "gpt2":
+                return current_path
         else:
             # Handle the case where there's not exactly one directory at this level
             print(f"Expected one directory at {current_path}, found {len(subdirectories)}.")
@@ -147,15 +149,22 @@ df = pd.DataFrame()
 
 # Main extraction function
 def extract_sweep_data_corrected(sweep_path):
-    global df
+    local_df = pd.DataFrame()
     results = {
         "sweep_name": os.path.basename(sweep_path),
         "summary": {},
         "parsed_config": {}
     }
     sweep_path = Path(sweep_path)
-    model_path = down_two(Path(sweep_path))
-    for dataset_path in model_path.iterdir():  # for each dataset path, we want to get the eval.csv and layer_ensembling.csv and dump into a df and append
+
+    # walk through sweep_path. if it has eval.csv and layer_ensembling.csv, then it is a dataset_path. collect all of them.
+    dataset_paths = []
+    for root, dirs, files in os.walk(sweep_path):
+        if 'eval.csv' in files and 'layer_ensembling.csv' in files and 'transfer' not in root:
+            dataset_paths.append(Path(root))
+
+
+    for dataset_path in dataset_paths:  # for each dataset path, we want to get the eval.csv and layer_ensembling.csv and dump into a df and append
         dataset = dataset_path.name
         eval_filepath = os.path.join(dataset_path, 'eval.csv')
         layer_ensembling_filepath = os.path.join(dataset_path, 'layer_ensembling.csv')
@@ -170,10 +179,9 @@ def extract_sweep_data_corrected(sweep_path):
         # also get: model and ds, should be easy by just printing from the path
         # i guess we also want the transfer configs too
         # and robust error handling, list of sweeps that don't have all the right stuff
-        if model_path.name == "gpt2":
-            model = model_path.name
-        else:
-            model = f"{model_path.parent.name}/{model_path.name}"
+        # read config yaml
+        config = yaml.safe_load(open(yaml_filepath, 'r'))
+        model = config['data']['model']
         
         results["model"] = model
         results["dataset"] = dataset
@@ -183,9 +191,8 @@ def extract_sweep_data_corrected(sweep_path):
             **{'model': model, 'dataset': dataset, 'sweep_name': results['sweep_name']}, 
             **results['summary']
         }
-        df = pd.concat([df, pd.DataFrame.from_dict([flattened_res])], ignore_index=True)
-    
-    return results
+        local_df = pd.concat([local_df, pd.DataFrame.from_dict([flattened_res])], ignore_index=True)
+    return local_df
 
 def filter_unique_configs(all_results):
     seen_configs = set()
@@ -206,22 +213,53 @@ def filter_unique_configs(all_results):
 
 def get_summary(sweeps_path):
     all_sweeps = os.listdir(sweeps_path)
-    all_results_corrected = [extract_sweep_data_corrected(os.path.join(sweeps_path, sweep)) for sweep in all_sweeps]
+    all_results_corrected = pd.concat([extract_sweep_data_corrected(os.path.join(sweeps_path, sweep)) for sweep in all_sweeps])
     # remove dupicates by config
-    filtered = filter_unique_configs(all_results_corrected)
+    # filtered = filter_unique_configs(all_results_corrected)
     
-    return filtered
+    return all_results_corrected
 
+expected_combos = {'eigen--True-0.5--True', 'eigen--False-1.0--False', 'eigen--True-0.0--False', 'ccs-burns-False--1.0*ccs-True', 'eigen--False-0.0--False', 'eigen--False-0.0--True', 'eigen--False-0.5--False',
+'ccs-leace-False--1.0*ccs_prompt_var-True', 'ccs-leace-True--1.0*ccs-True', 'eigen--True-0.5--False', 'ccs-burns-False--1.0*ccs_prompt_var-True', 'eigen--False-0.5--True', 'ccs-burns-True--1.0*ccs-True', 'ccs-burns-True--1.0*ccs_prompt_var-True',
+'ccs-leace-False--1.0*ccs-True', 'eigen--False-1.0--True', 'ccs-leace-True--1.0*ccs_prompt_var-True', 'eigen--True-1.0--False', 'eigen--True-1.0--True', 'eigen--True-0.0--True'}
+
+# get combos from specifically llama 13b
+def filter_combos(df):
+    # filter only expected combos but drop them before returning
+    print(f'dropping {len(df[~df["combo"].isin(expected_combos)])} rows')
+    return df[df['combo'].isin(expected_combos)]
+
+def filter_models(df):
+    expected_models = [
+        # 'allenai/unifiedqa-t5-11b',
+        'EleutherAI/gpt-j-6b',
+        # 'bigscience/T0pp',
+        'bigscience/bloom-7b1',
+        # 'huggyllama/llama-7b',
+        'EleutherAI/pythia-6.9b',
+        # 'huggyllama/llama-30b',
+        'meta-llama/Llama-2-13b-hf',
+        # 'EleutherAI/pythia-12b',
+        # 'sshleifer/tiny-gpt2',
+        'meta-llama/Llama-2-7b-hf',
+        # 'microsoft/deberta-v2-xxlarge-mnli'
+    ]
+    print(f'dropping {len(df[~df["model"].isin(expected_models)])} rows')
+    return df[df['model'].isin(expected_models)]
 
 def find_missing_combinations(df):
     # Create a column with the combination of the six config values as a string
+    print(df)
     df['combo'] = df[['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']].astype(str).apply(lambda x: '-'.join(x), axis=1)
+
+    # filter only expected combos
+    df = filter_combos(df)
 
     # Create a DataFrame of all possible combinations
     all_possible_combinations = pd.MultiIndex.from_product([
-        df['model'].unique(),
-        df['dataset'].unique(),
-        df['combo'].unique()
+        df['model'].unique(),  # models
+        df['dataset'].unique(),  # 9
+        pd.Series(list(expected_combos))  # 20
     ], names=['model', 'dataset', 'combo']).to_frame(index=False)
 
     # Merge with unique_entries to find missing combinations
@@ -231,17 +269,32 @@ def find_missing_combinations(df):
     
     # Split the 'combo' column back to original columns
     config_cols = ['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']
-    missing_combinations[config_cols] = missing_combinations['combo'].str.split('-', expand=True)
-    
-    # Convert "nan" back to empty strings for certain columns
-    for col in config_cols:
-        missing_combinations[col] = missing_combinations[col].replace('nan', '')
-    
-    # Drop the 'combo' column and return the missing rows
-    missing_combinations = missing_combinations.drop(columns=['combo'])
+    if len(missing_combinations) == 0:
+        print("No missing combinations found")
+        return []
+    else:
+        missing_combinations[config_cols] = missing_combinations['combo'].str.split('-', expand=True)
+        
+        # Convert "nan" back to empty strings for certain columns
+        for col in config_cols:
+            missing_combinations[col] = missing_combinations[col].replace('nan', '')
+        
+        # Drop the 'combo' column and return the missing rows
 
-    return [Sweep.from_df_row(row) for i, row in missing_combinations.iterrows()]
+        print(f"{len(missing_combinations)} missing combinations found")
+        # print breakdown count by model
+        print(missing_combinations['model'].value_counts())
+        # print breakdown count by dataset
+        print(missing_combinations['dataset'].value_counts())
+        # print breakdown count by combo
+        print(missing_combinations['combo'].value_counts())
 
+        return [Sweep.from_df_row(row) for i, row in missing_combinations.iterrows()]
+
+
+def add_combo(df):
+    df['combo'] = df[['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']].astype(str).apply(lambda x: '-'.join(x), axis=1)
+    return df
 
 if __name__ == '__main__':
     import os
@@ -250,25 +303,52 @@ if __name__ == '__main__':
     filename = 'all_results.csv'
 
     # load if exists
-    # if os.path.exists(filename):
-    #     df = pd.read_csv(filename)
-    # else:
-    data_directory = Path('./data').resolve()  # Replace with the correct path to your data directory
-    all_sweep_dirs = [
-        (data_directory / sweeps).resolve() 
-        for sweeps in os.listdir(data_directory) 
-        if (path := Path(os.path.join(data_directory, sweeps))).is_dir() and 
-        path.name.endswith('_no_reporters')
-    ]
-    for sweeps in all_sweep_dirs:
-        summary = get_summary(sweeps)
+    if False:
+        df = pd.read_csv(filename)
+    else:
+        data_directory = Path('./data').resolve()  # Replace with the correct path to your data directory
+        all_sweep_dirs = [
+            (data_directory / sweeps).resolve() 
+            for sweeps in os.listdir(data_directory) 
+            if (path := Path(os.path.join(data_directory, sweeps))).is_dir() and 
+            path.name.endswith('_no_reporters')
+        ]
+        for sweeps in all_sweep_dirs:
+            summary_df = get_summary(sweeps)
+            add_combo(summary_df)
+            print(f"{sweeps.name} has {len(summary_df)} rows")
+            df = pd.concat([df, summary_df], ignore_index=True)
+            # if '7b' in sweeps.name:
+            #     breakpoint()
+            # how many duplicates in summary_df
+            # print(f"Duplicate rows: {len(summary_df[summary_df.duplicated()])}")
+
+    df['combo'] = df[['net', 'norm', 'per probe prompt', 'neg_cov_weight', 'loss', 'erase_prompt']].astype(str).apply(lambda x: '-'.join(x), axis=1)
+    df = filter_combos(df)
+    df = filter_models(df)
+    df = df.drop_duplicates(subset=['model', 'dataset', 'combo'])
 
     df.to_csv(filename, index=False)
     missing_sweeps = find_missing_combinations(df)
+    print(f"Unique models: {df['model'].unique()}, {len(df['model'].unique())}")
+    # make into a python list df['model'].unique()
+
+    print(f"Unique datasets: {df['dataset'].unique()}, {len(df['dataset'].unique())}")
+    print(f"Unique combos: {df['combo'].unique()}, {len(df['combo'].unique())}")
+
+    # check for duplicate rows
+    # df_sorted = df.sort_values(by=['model', 'dataset', 'combo'])
+    # duplicate_rows = df[df[['model', 'dataset', 'combo']].duplicated(keep=False)]
+    # duplicate_rows.to_csv('duplicate_rows.csv', index=False)
+    # print(duplicate_rows)
+
+    # drop duplicate rows by model, dataset, combo
+    
+
     extra_args = {
         'num_gpus': 4,
     }
-    for sweep in missing_sweeps:
+    for sweep in missing_sweeps[:10]:
         print(f'"{sweep.to_command(extra_args)}" \\')
         
 
